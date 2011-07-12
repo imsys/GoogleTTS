@@ -1,19 +1,27 @@
 ﻿# -*- coding: utf-8 -*-
 # Author:  Arthur Helfstein Fragoso
 # Email: arthur@life.net.br
-# Based on: "hello-world plugin" and "aprendiendoTTS"
+# Based on: "hello-world plugin", "aprendiendoTTS" and "Japanese Support"
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin
-version = '0.0.12'
+version = '0.1.0'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on Monday, 7 February
+#  Edited on Saturday, 5 March 2011
 #  
 ########################### Instructions #######################################
+#
+# MP3 Mass Generator - Generate many mp3 files at once (like magic) :D
+#
+# go to the Cards/Facts Browser, select the cards to get the mp3 file generated,
+# and go to the menu "Action" > "GoogleTTS MP3 Mass Generator"
+#
+# really easy ;)
+#
 #
 # In your cards, you can add: [GTTS:language_code:text] and GoogleTTS will read it for you. 
 # you may have many different languages in the same field
@@ -23,8 +31,12 @@ version = '0.0.12'
 # so if you want GoogleTTS to read a field for you, you can edit your card's model and leave it like:
 # [GTTS:en:{{Field Name}}]
 #
-# if you do not want to the [GTTS::] appears, you can hide it like:
-# <span style="color:#ffffff;">[GTTS:en:{{Field Name}}]</span>
+# To hide the [GTTS::] tag and everthing inside it in a card model (only) (thanks Rdamon for the idea)
+# <!-- [GTTS:en:{{Field Name}}] -->
+#
+#
+# to hide it while editing a card, the only way I know is:
+# <span style="color:#ffffff;">[GTTS:en:Hello World]</span>
 #
 # it will only read the cards on the Anki Desktop, if you want it on the mobile, you need to generate the MP3 files.
 #
@@ -154,6 +166,7 @@ from ankiqt import mw
 from anki import sound
 from anki.sound import playFromText
 from anki.utils import stripHTML
+from anki.facts import Fact
 from subprocess import Popen, PIPE, STDOUT
 from urllib import quote_plus
 from ankiqt.ui import view,facteditor,utils
@@ -161,6 +174,7 @@ from anki.hooks import wrap
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtGui import *
 from PyQt4.QtSvg import *
+
 
 language_generator = TTS_language
 file_max_length = 255 #filename max length for Unix
@@ -210,6 +224,7 @@ def TTS_read(text, language=TTS_language):
 
 
 ###################  TTS_record to generate MP3 files
+
 
 
 def TTS_record(text, language=TTS_language):
@@ -309,7 +324,7 @@ def GTTS_Fact_edit_setupFields(self):
 	GoogleTTS.setCheckable(True)
 	GoogleTTS.connect(GoogleTTS, SIGNAL("clicked()"), lambda self=self: GTTS_Factedit_button(self))
 	GoogleTTS.setIcon(QIcon(":/icons/speaker.png"))
-	GoogleTTS.setToolTip(_("GoogleTTS ::  "))
+	GoogleTTS.setToolTip(_("GoogleTTS :: MP3 File Generator"))
 	GoogleTTS.setShortcut(_("Ctrl+g"))
 	GoogleTTS.setFocusPolicy(Qt.NoFocus)
 	#GoogleTTS.setEnabled(False)
@@ -388,6 +403,150 @@ mw.mainWin.GoogleTTS.setIcon(QtGui.QIcon(":/icons/speaker.png"))
 mw.connect(mw.mainWin.GoogleTTS, QtCore.SIGNAL('triggered()'), GTTS_option_menu)
 mw.mainWin.menuTools.addAction(mw.mainWin.GoogleTTS)
 
+
+####################  MP3 Mass Generator
+
+
+srcField = -1
+dstField = -1
+generate_sound_tags = True
+
+
+class GTTS_mp3_mass_generator_Dialog(object):
+	def setupUi(self, Dialog):
+		Dialog.setObjectName("Dialog")
+		Dialog.resize(400, 300)
+		Dialog.setWindowTitle("GoogleTTS :: MP3 Mass Generator")
+
+		buttonBox = QDialogButtonBox(Dialog);
+		buttonBox.setGeometry(QtCore.QRect(30, 240, 341, 32));
+		buttonBox.setOrientation(QtCore.Qt.Horizontal);
+		buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok|QtGui.QDialogButtonBox.Cancel);
+		verticalLayoutWidget = QtGui.QWidget(Dialog);
+		verticalLayoutWidget.setGeometry(QtCore.QRect(20, 70, 357, 171));
+		verticalLayout = QtGui.QVBoxLayout(verticalLayoutWidget);
+		verticalLayout.setContentsMargins(0, 0, 0, 0);
+		label_2 = QtGui.QLabel(verticalLayoutWidget);
+		label_2.setText("GoogleTTS will generate MP3 files to all selected facts.");
+
+		verticalLayout.addWidget(label_2);
+
+		self.factkeys = mw.deck.allFields()
+
+
+		formLayoutWidget = QtGui.QWidget(Dialog)
+		formLayoutWidget.setGeometry(QtCore.QRect(20, 60, 329, 118));
+		formLayout = QtGui.QFormLayout(formLayoutWidget);
+		#formLayout.setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+		formLayout.setContentsMargins(0, 0, 0, 0);
+
+
+
+		languageLabel = QtGui.QLabel(formLayoutWidget)
+		languageLabel.setText("Language")
+		formLayout.setWidget(0, QtGui.QFormLayout.LabelRole, languageLabel)
+		self.languageComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.languageComboBox.addItems([d[1] for d in slanguages])
+		self.languageComboBox.setCurrentIndex(get_language_id(TTS_language))
+		formLayout.setWidget(0, QtGui.QFormLayout.FieldRole, self.languageComboBox)
+
+
+		sourceFieldLabel = QtGui.QLabel(formLayoutWidget)
+		sourceFieldLabel.setText("Source Field")
+		formLayout.setWidget(1, QtGui.QFormLayout.LabelRole, sourceFieldLabel)
+		self.sourceFieldComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.sourceFieldComboBox.addItems([d for d in self.factkeys])
+		self.sourceFieldComboBox.setCurrentIndex(srcField)
+		formLayout.setWidget(1, QtGui.QFormLayout.FieldRole, self.sourceFieldComboBox)
+
+
+		destinationFieldLabel = QtGui.QLabel(formLayoutWidget)
+		destinationFieldLabel.setText("Destination Field")
+		formLayout.setWidget(2, QtGui.QFormLayout.LabelRole, destinationFieldLabel)
+		self.destinationFieldComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.destinationFieldComboBox.addItems([d for d in self.factkeys])
+		self.destinationFieldComboBox.setCurrentIndex(dstField)
+		formLayout.setWidget(2, QtGui.QFormLayout.FieldRole, self.destinationFieldComboBox)
+
+
+		self.checkBox = QtGui.QCheckBox(Dialog)
+		self.checkBox.setText("Generate sound file path within the [sound:] tag.")
+		if generate_sound_tags:
+			self.checkBox.setChecked(True)
+
+		label = QtGui.QLabel(verticalLayoutWidget);
+		label.setText("It will overwrite anything in the Destination Field. Make sure to select the right field. It may take a while.");
+		label.setWordWrap(True);
+
+		verticalLayout.addWidget(formLayoutWidget);
+		verticalLayout.addWidget(self.checkBox);
+		verticalLayout.addWidget(label);
+
+		label_3 = QtGui.QLabel(Dialog)
+		label_3.setGeometry(QtCore.QRect(100, 10, 200, 51))
+		label_3.setText("GoogleTTS")
+		font = QtGui.QFont()
+		font.setBold(True)
+		font.setPointSize(27)
+		label_3.setFont(font)
+		label_4 = QtGui.QLabel(Dialog)
+		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
+		label_4.setText("Version "+version)
+
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
+		QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+def generate_audio_files(factIds, language, srcField_name, dstField_name, generate_sound_tags):
+	mw.deck.startProgress(max=len(factIds))
+	for c, id in enumerate(factIds):
+		mw.deck.updateProgress(label="Generating MP3...", value=c)
+		fact = mw.deck.s.query(Fact).get(id)
+		try:
+			if generate_sound_tags:
+				fact[dstField_name] = '[sound:'+ TTS_record(fact[srcField_name], language) +']'
+			else:
+				fact[dstField_name] = TTS_record(fact[srcField_name], language)
+		except:
+			pass
+	try:
+		mw.deck.refreshSession()
+	except:
+		# old style
+		mw.deck.refresh()
+	mw.deck.updateCardQACacheFromIds(factIds, type="facts")
+	mw.deck.finishProgress()
+
+def setupMenu(editor):
+	a = QAction("GoogleTTS MP3 Mass Generator", editor)
+	a.setIcon(QtGui.QIcon(":/icons/speaker.png"))
+	editor.connect(a, SIGNAL("triggered()"), lambda e=editor: onGenerate(e))
+	editor.dialog.menuActions.addSeparator()
+	editor.dialog.menuActions.addAction(a)
+
+def onGenerate(editor):
+	global TTS_language, dstField, srcField, generate_sound_tags
+	n = "Generate MP3 files"
+	d = QDialog()
+	form = GTTS_mp3_mass_generator_Dialog()
+	form.setupUi(d)
+	if d.exec_():		
+		TTS_language = slanguages[form.languageComboBox.currentIndex()][0]
+		srcField = form.sourceFieldComboBox.currentIndex()
+		dstField = form.destinationFieldComboBox.currentIndex()
+		generate_sound_tags = form.checkBox.isChecked()
+		if srcField != -1 and dstField != -1 :
+			editor.parent.setProgressParent(editor)
+			editor.deck.setUndoStart(n)
+			generate_audio_files(editor.selectedFacts(), TTS_language, form.factkeys[srcField], form.factkeys[dstField], generate_sound_tags)
+			editor.deck.setUndoEnd(n)
+			editor.parent.setProgressParent(None)
+			editor.updateSearch()
+		else:
+			utils.showInfo("You should select the Source and Destination Field!")
+
+from anki.hooks import addHook
+addHook("editor.setupMenus", setupMenu)
 
 
 ######################################### Keys and Redisplay
