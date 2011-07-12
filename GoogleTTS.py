@@ -4,7 +4,8 @@
 # Based on: "hello-world plugin" and "aprendiendoTTS"
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
-#   GoogleTTS plugin version 0.0.10
+#   GoogleTTS plugin
+version = '0.0.11'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
@@ -121,9 +122,11 @@ from PyQt4.QtGui import *
 from PyQt4.QtSvg import *
 
 language_generator = TTS_language
+file_max_length = 255 #filename max length for Unix
 
 # mplayer for windows
 if subprocess.mswindows:
+	file_max_length = 100 #guess of a filename max length for Windows (filename +path = 255)
 	dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 	os.environ['PATH'] += ";" + dir
 	si = subprocess.STARTUPINFO()
@@ -142,7 +145,7 @@ def get_language_id(language_code):
 
 def TTS_read(text, language=TTS_language):
 	text = re.sub("\[sound:.*?\]", "", stripHTML(text.encode('utf-8').replace("\n", "")))
-	address = 'http://translate.google.com/translate_tts?tl='+language+'&q="'+ quote_plus(text) +'"' 
+	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
 	if subprocess.mswindows:
 		if MSwin_subprocess:
 			subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
@@ -151,13 +154,18 @@ def TTS_read(text, language=TTS_language):
 	else:
 		subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 
+
 def TTS_record(text, language=TTS_language):
 	text = re.sub("\[sound:.*?\]", "", stripHTML(text.encode('utf-8').replace("\n", "")))
-	address = 'http://translate.google.com/translate_tts?tl='+language+'&q="'+ quote_plus(text) +'"'
-	if quote_mp3:
-		file = quote_plus(text)+'.mp3'
+	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
+	if quote_mp3: #re.sub removes \/:*?"<>|[]. from the file name
+		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text))+'.mp3'
+		if len(file) > file_max_length:
+			file = file[0:file_max_length-4] +'.mp3'
 	else:
-		file = text+'.mp3'
+		file = re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text)+'.mp3'
+		if len(file) > file_max_length:
+			file = file[0:file_max_length-4] +'.mp3'
 		if subprocess.mswindows:
 			file = file.decode('utf-8').encode(slanguages[get_language_id(language)][2])
 	if subprocess.mswindows:
@@ -203,33 +211,38 @@ class Ui_Dialog1(object):
 		Dialog.setObjectName("Dialog")
 		Dialog.resize(400, 300)
 		Dialog.setWindowTitle("GoogleTTS :: MP3 File Generator")
-		self.gridLayout = QtGui.QGridLayout(Dialog);
-		self.gridLayout.setContentsMargins(10, 10, 10, 10);
-		self.comboboxlabel = QtGui.QLabel(Dialog);
-		self.comboboxlabel.setText("Language:");
+		self.gridLayout = QtGui.QGridLayout(Dialog)
+		self.gridLayout.setContentsMargins(10, 10, 10, 10)
+		self.comboboxlabel = QtGui.QLabel(Dialog)
+		self.comboboxlabel.setText("Language:")
 		self.combobox = QtGui.QComboBox()
 		self.combobox.addItems([d[1] for d in slanguages])
 		self.combobox.setCurrentIndex(get_language_id(language_generator))
-		self.textEditlabel = QtGui.QLabel(Dialog);
-		self.textEditlabel.setText("Text:");
+		self.textEditlabel = QtGui.QLabel(Dialog)
+		self.textEditlabel.setText("Text:")
+		self.charleft = QtGui.QLabel(Dialog)
+		self.charleft.setText("Characters left: 100")
+		self.charleft.setToolTip(_("GoogleTTS can read up to 100 characters, no more than that, sorry :'("))
 		self.textEdit = QtGui.QTextEdit(Dialog)
 		self.textEdit.setAcceptRichText(False)
 		self.textEdit.setObjectName("textEdit")
 
-		self.gridLayout.addWidget(self.comboboxlabel, 0, 0, 1, 1);
-		self.gridLayout.addWidget(self.combobox, 1, 0, 1, 1);
-		self.gridLayout.addWidget(self.textEditlabel, 0, 1, 1, 1);
-		self.gridLayout.addWidget(self.textEdit, 1, 1, 1, 1);
+		self.gridLayout.addWidget(self.comboboxlabel, 0, 0, 1, 1)
+		self.gridLayout.addWidget(self.combobox, 1, 0, 1, 1)
+		self.gridLayout.addWidget(self.textEditlabel, 0, 1, 1, 1)
+		self.gridLayout.addWidget(self.charleft, 0, 2, 1, 1)
+		self.gridLayout.addWidget(self.textEdit, 1, 1, 1, 2)
 		self.buttonBox = QtGui.QDialogButtonBox(Dialog)
 		self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
 		self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok|QtGui.QDialogButtonBox.Cancel)
 		self.buttonBox.setObjectName("buttonBox")
-		self.gridLayout.addWidget(self.buttonBox, 3, 1, 1, 1);
+		self.gridLayout.addWidget(self.buttonBox, 3, 1, 1, 3)
 		self.previewbutton = QtGui.QPushButton(Dialog)
 		self.previewbutton.setObjectName("preview")
-		self.previewbutton.setText("Preview");
-		self.gridLayout.addWidget(self.previewbutton, 2, 1, 1, 1);
+		self.previewbutton.setText("Preview")
+		self.gridLayout.addWidget(self.previewbutton, 2, 1, 1, 2)
 
+		QtCore.QObject.connect(self.textEdit, QtCore.SIGNAL("textChanged()"), lambda self=self: self.charleft.setText("Characters left: "+ str(100-len(unicode(self.textEdit.toPlainText()).encode('utf-8')))))
 		QtCore.QObject.connect(self.previewbutton, QtCore.SIGNAL("clicked()"), lambda self=self: TTS_read(unicode(self.textEdit.toPlainText()), slanguages[self.combobox.currentIndex()][0]))
 		QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
 		QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
@@ -303,7 +316,7 @@ class GTTS_option_menu_Dialog(object):
 		verticalLayout.addWidget(self.combobox);
 
 		label = QtGui.QLabel(verticalLayoutWidget);
-		label.setText("This will be reseted when you close Anki, for a permanent change you have to edit the GoogleTTS.py file.");
+		label.setText("This will be reset when you close Anki. For a permanent change, you have to edit the GoogleTTS.py file.");
 		label.setWordWrap(True);
 
 		verticalLayout.addWidget(label)
@@ -317,7 +330,7 @@ class GTTS_option_menu_Dialog(object):
 		label_3.setFont(font)
 		label_4 = QtGui.QLabel(Dialog)
 		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
-		label_4.setText("Version 0.0.10")
+		label_4.setText("Version "+version)
 
 		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
 		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
