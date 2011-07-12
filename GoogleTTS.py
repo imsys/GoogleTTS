@@ -5,46 +5,84 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin
-version = '0.0.11'
+version = '0.0.12'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on Saturday, 29 January
+#  Edited on Monday, 7 February
 #  
+########################### Instructions #######################################
+#
+# In your cards, you can add: [GTTS:language_code:text] and GoogleTTS will read it for you. 
+# you may have many different languages in the same field
+# note that each tag is limited to 100 characters.
+# example: [GTTS:en:Hello, whats your name?] [GTTS:zh:你好吗？] [GTTS:ja:はい]
+#
+# so if you want GoogleTTS to read a field for you, you can edit your card's model and leave it like:
+# [GTTS:en:{{Field Name}}]
+#
+# if you do not want to the [GTTS::] appears, you can hide it like:
+# <span style="color:#ffffff;">[GTTS:en:{{Field Name}}]</span>
+#
+# it will only read the cards on the Anki Desktop, if you want it on the mobile, you need to generate the MP3 files.
+#
+#
 ########################### Settings #######################################
-
 from PyQt4.QtCore import *
 TTS_read_field = {}
 
 
-# Key to get the Answer pronounced
-TTS_KEY_A=Qt.Key_F4
-
-# Key to get the question pronounced
+# Key to get the [GTTS::] tags in the Question pronounced
 TTS_KEY_Q=Qt.Key_F3
 
+# Key to get the [GTTS::] tags in the Answer pronounced
+TTS_KEY_A=Qt.Key_F4
 
-# Option to automatically recite questions as they appear
-automaticQuestions = False
-#automaticQuestions = True
+# Key to get the whole Question pronounced
+TTS_KEY_Q_ALL=Qt.Key_F6
 
-# Option to automatically recite answers as they appear
-automaticAnswers = False
-#automaticAnswers = True
+# Key to get the whole Answer pronounced
+TTS_KEY_A_ALL=Qt.Key_F7
 
 
+
+#sorry, the TTS wont recite it automatically when there is a sound file in the Question/Answer
+# Option to automatically recite the [GTTS::] tags in the Questions as it appears
+#automaticQuestions_tags = False
+automaticQuestions_tags = True
+
+# Option to automatically recite the [GTTS::] tags in the Answers as it appears
+#automaticAnswers_tags = False
+automaticAnswers_tags = True
+
+
+# Option to automatically recite everything that is in the Questions as it appears with the default language.
+automaticQuestions_whole = False
+#automaticQuestions_whole = True
+
+# Option to automatically recite everything that is in the Answers as it appears with the default language.
+automaticAnswers_whole = False
+#automaticAnswers_whole = True
+
+
+
+#
 # Keys to get the fields pronounced, case sensitive
 # uncomment and change in a way that works for you,
 # you can add as many as you want
+# *** this function will probably be removed in the next version,
+# *** so try to use the [GTTS:language_code:{{Field Name}}] tag as explained above.
+# *** the [GTTS::] tags are much more flexible, and easier to configure when you have many decks and different languages
+# *** if you are against the removal of this function, send me a email with the reasons
 # examples:
 #TTS_read_field['Field Name'] =  Qt.Key_F9
 #TTS_read_field['Front'] =  Qt.Key_F5
 #TTS_read_field['Back'] = Qt.Key_F6
 #TTS_read_field['Reading'] =  Qt.Key_F7
 #TTS_read_field['Text'] = Qt.Key_F8
-#all the avaliable keys are in http://doc.trolltech.com/qtjambi-4.4/html/com/trolltech/qt/core/Qt.Key.html
+#all the available keys are in http://doc.trolltech.com/qtjambi-4.4/html/com/trolltech/qt/core/Qt.Key.html
 
 # quote (encode) special characters for mp3 file names:
 # Windows users should have their mp3 files quoted (True), if you want to try, the system encoding should be the same as the language you are learning. and in the Table slanguage, the right charset should be set there. (it may not work, do this only if you know what you are doing. If you want it really want it, install Linux! :D
@@ -54,12 +92,14 @@ quote_mp3 = True	# sp%C3%A9cial.mp3 %E3%81%AF%E3%81%84.mp3 %E4%BD%A0%E5%A5%BD.mp
 #quote_mp3 = False  # spécial.mp3 はい.mp3　你好.mp3
 
 
-#subprocessing is disabled by default on MS Windows,
-#if you enable it (true), it *may or may not* result in a bug of cut the ending of a speech occasionally
+#subprocessing is disabled by default
+#if you enable it (true) on MS Windows, it *may or may not* result in a bug of cut the ending of a speech occasionally
+#all plataforms: if it's enable, it will be able to play only one [GTTS::] tags in the answer/question, even if there is two or more.
 #if it's disable(false), Anki will be frozen while GoogleTTS is reciting the speech. 
-#so you can try if you want. For Unix users, it works normally with subprocessing, you can just ignore it.
-MSwin_subprocess = False
-#MSwin_subprocess = True
+#so you can try it if you want.
+subprocessing = False
+#subprocessing = True
+
 
 #Language code
 TTS_language = 'en'
@@ -112,6 +152,7 @@ slanguages = [['af', 'Afrikaans'],
 import os, subprocess, re, sys
 from ankiqt import mw
 from anki import sound
+from anki.sound import playFromText
 from anki.utils import stripHTML
 from subprocess import Popen, PIPE, STDOUT
 from urllib import quote_plus
@@ -136,6 +177,8 @@ if subprocess.mswindows:
 		# python2.7+
 		si.dwFlags |= subprocess._subprocess.STARTF_USESHOWWINDOW
 
+
+######## utils
 def get_language_id(language_code):
 	x = 0
 	for d in slanguages:
@@ -143,20 +186,34 @@ def get_language_id(language_code):
 			return x
 		x = x + 1
 
+def playTTSFromText(text):
+	for match in re.findall("\[GTTS:(.*?):(.*?)\]", text, re.M|re.I):
+		TTS_read(match[1], match[0])
+
+
+###########  TTS_read to recite the tts on-the-fly
+
 def TTS_read(text, language=TTS_language):
-	text = re.sub("\[sound:.*?\]", "", stripHTML(text.encode('utf-8').replace("\n", "")))
+	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
 	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
+	#utils.showInfo(address)
 	if subprocess.mswindows:
-		if MSwin_subprocess:
+		if subprocessing:
 			subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 		else:
 			subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
 	else:
-		subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		if subprocessing:
+			subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		else:
+			subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+
+
+###################  TTS_record to generate MP3 files
 
 
 def TTS_record(text, language=TTS_language):
-	text = re.sub("\[sound:.*?\]", "", stripHTML(text.encode('utf-8').replace("\n", "")))
+	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
 	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
 	if quote_mp3: #re.sub removes \/:*?"<>|[]. from the file name
 		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text))+'.mp3'
@@ -177,33 +234,9 @@ def TTS_record(text, language=TTS_language):
 	return file.decode('utf-8')
 
 
-## Check pressed key
-def newKeyPressEvent(evt):
-	pkey = evt.key()
-	if (mw.state == 'showAnswer' or mw.state == 'showQuestion'):
-		if (pkey == TTS_KEY_Q):
-			TTS_read(mw.currentCard.question,TTS_language)
-		elif (mw.state=='showAnswer' and pkey == TTS_KEY_A):
-			TTS_read(mw.currentCard.answer,TTS_language)
-		else:
-			for key in TTS_read_field:
-				if TTS_read_field[key] == pkey:
-					TTS_read(mw.currentCard.fact.get(key, 0),TTS_language)
-					break
-	evt.accept()
-	return oldEventHandler(evt)
-
-def GTTSredisplay(self):
-	if (mw.state == 'showQuestion' and automaticQuestions) :
-		TTS_read(mw.currentCard.question,TTS_language)
-	elif (mw.state=='showAnswer' and automaticAnswers) :
-		TTS_read(mw.currentCard.answer,TTS_language)
-
-oldEventHandler = mw.keyPressEvent
-mw.keyPressEvent = newKeyPressEvent
-view.View.redisplay = wrap(view.View.redisplay, GTTSredisplay,"after")
 
 
+############################ MP3 File Generator
 
 
 class Ui_Dialog1(object):
@@ -276,7 +309,7 @@ def GTTS_Fact_edit_setupFields(self):
 	GoogleTTS.setCheckable(True)
 	GoogleTTS.connect(GoogleTTS, SIGNAL("clicked()"), lambda self=self: GTTS_Factedit_button(self))
 	GoogleTTS.setIcon(QIcon(":/icons/speaker.png"))
-	GoogleTTS.setToolTip(_("GoogleTTS :: MP3 File Generator (Ctrl+g)"))
+	GoogleTTS.setToolTip(_("GoogleTTS ::  "))
 	GoogleTTS.setShortcut(_("Ctrl+g"))
 	GoogleTTS.setFocusPolicy(Qt.NoFocus)
 	#GoogleTTS.setEnabled(False)
@@ -289,6 +322,8 @@ GTTS_Fact_edit_setupFields(mw.editor)
 
 
 
+
+#################### TTS in Tool's menu
 
 class GTTS_option_menu_Dialog(object):
 	def setupUi(self, Dialog):
@@ -337,7 +372,6 @@ class GTTS_option_menu_Dialog(object):
 		QtCore.QMetaObject.connectSlotsByName(Dialog)
 
 
-
 def GTTS_option_menu():
 	global TTS_language
 	d = QDialog()
@@ -353,6 +387,50 @@ mw.mainWin.GoogleTTS.setEnabled(True)
 mw.mainWin.GoogleTTS.setIcon(QtGui.QIcon(":/icons/speaker.png"))
 mw.connect(mw.mainWin.GoogleTTS, QtCore.SIGNAL('triggered()'), GTTS_option_menu)
 mw.mainWin.menuTools.addAction(mw.mainWin.GoogleTTS)
+
+
+
+######################################### Keys and Redisplay
+
+## Check pressed key
+def newKeyPressEvent(evt):
+	pkey = evt.key()
+	if (mw.state == 'showAnswer' or mw.state == 'showQuestion'):
+		if (pkey == TTS_KEY_Q):
+			playTTSFromText(mw.currentCard.question)  #read the GTTS tags
+		elif (pkey == TTS_KEY_Q_ALL):
+			TTS_read(mw.currentCard.question,TTS_language) #read the the whole field
+		elif (mw.state=='showAnswer' and pkey == TTS_KEY_A):
+			playTTSFromText(mw.currentCard.answer) #read the GTTS tags
+		elif (mw.state=='showAnswer' and pkey == TTS_KEY_A_ALL):
+			TTS_read(mw.currentCard.answer,TTS_language)  #read the the whole field
+		else:
+			for key in TTS_read_field:
+				if TTS_read_field[key] == pkey:
+
+					TTS_read(mw.currentCard.fact.get(key, 0),TTS_language)
+					break
+	evt.accept()
+	return oldEventHandler(evt)
+
+
+def GTTSredisplay(self):
+	if (mw.state == 'showQuestion' and not sound.hasSound(mw.currentCard.question)):
+		if (automaticQuestions_tags):
+			playTTSFromText(mw.currentCard.question)
+		if (automaticQuestions_whole):
+			TTS_read(mw.currentCard.question,TTS_language)
+	elif (mw.state=='showAnswer' and not sound.hasSound(mw.currentCard.answer)):
+		if (automaticAnswers_tags):
+			playTTSFromText(mw.currentCard.answer)
+		if (automaticAnswers_whole):
+			TTS_read(mw.currentCard.answer,TTS_language)
+
+oldEventHandler = mw.keyPressEvent
+mw.keyPressEvent = newKeyPressEvent
+
+
+view.View.redisplay = wrap(view.View.redisplay, GTTSredisplay,"after")
 
 
 
