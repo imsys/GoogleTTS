@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin
-version = '0.1.2'
+version = '0.1.3'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on Sunday, 12 February 2012
+#  Edited on Tuesday, 24 April 2012  
 #  
 ########################### Instructions #######################################
 #
@@ -105,7 +105,7 @@ automaticAnswers = False                         # disable the automatic recite
 # Windows users should have their mp3 files quoted (True), if you want to try, the system encoding should be the same as the language you are learning. and in the Table slanguage, the right charset should be set there. (it may not work, do this only if you know what you are doing. If you want it really want it, install Linux! :D
 # Unix users don't need to quote (encode) special characters. so you can set it as False if you want.
 # it will work alright sync with AnkiMobile, but it won't work with AnkiWeb
-quote_mp3 = True	# sp%C3%A9cial.mp3 %E3%81%AF%E3%81%84.mp3 %E4%BD%A0%E5%A5%BD.mp3
+quote_mp3 = True	# spC3A9cial.mp3 E381AFE38184.mp3 E4BDA0E5A5BD.mp3
 #quote_mp3 = False  # spécial.mp3 はい.mp3　你好.mp3
 
 
@@ -283,7 +283,7 @@ def TTS_record(text, language=TTS_language):
 	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
 	address = TTS_ADDRESS+'?tl='+language+'&q='+ quote_plus(text)
 	if quote_mp3: #re.sub removes \/:*?"<>|[]. from the file name
-		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text))+'.mp3'
+		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text)).replace("%", "")+'.mp3'
 		if len(file) > file_max_length:
 			file = file[0:file_max_length-4] +'.mp3'
 	else:
