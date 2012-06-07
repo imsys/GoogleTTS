@@ -1,17 +1,17 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Author:  Arthur Helfstein Fragoso
 # Email: arthur@life.net.br
 # Based on: "hello-world plugin", "aprendiendoTTS" and "Japanese Support"
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin
-version = '0.1.1'
+version = '0.1.2'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on Friday, 2 September 2011
+#  Edited on Sunday, 12 February 2012
 #  
 ########################### Instructions #######################################
 #
@@ -34,15 +34,21 @@ version = '0.1.1'
 # To hide the [GTTS::] tag and everything inside it in a card model (only) (thanks Rdamon for the idea)
 # <!-- [GTTS:en:{{Field Name}}] -->
 #
-#
 # to hide it while editing a card, the only way I know is:
 # <span style="color:#ffffff;">[GTTS:en:Hello World]</span>
 #
 # it will only read the cards on the Anki Desktop, if you want it on the mobile, you need to generate the MP3 files.
 #
+## Proxy - If you use a proxy connection, GoogleTTS plugin will use the configuration
+# from Anki's proxy confirguration (Settings > Preferences > Network > Proxy) 
+# it will only take effect after restarting Anki. If Anki's proxy configuration is
+# empty, it will try to use the Operational System proxy configuration.
+#
+# Thanks Scott Otterson for contributing with the proxy code.
+#
 #######################################
 #
-# I have a recommendation to everybody:
+# Some personal recomendation:
 # I encourage you to watch the documentary movie: "Zeitgeist: Moving Forward"
 # It's probably the most important movie you could ever watch.
 # http://www.youtube.com/watch?v=4Z9WVZddH9w
@@ -53,40 +59,34 @@ version = '0.1.1'
 ########################### Settings #######################################
 from PyQt4.QtCore import *
 TTS_read_field = {}
+TTS_tags_only, TTS_if_no_tag_read_whole = [1,2]
 
 
-# Key to get the [GTTS::] tags in the Question pronounced
+# Key to get the [GTTS::] tags in the Question field pronounced
 TTS_KEY_Q=Qt.Key_F3
 
-# Key to get the [GTTS::] tags in the Answer pronounced
+# Key to get the [GTTS::] tags in the Answer field pronounced
 TTS_KEY_A=Qt.Key_F4
 
-# Key to get the whole Question pronounced
+# Key to get the whole Question field pronounced, if there is a [GTTS::] tags, it will only read the tags
 TTS_KEY_Q_ALL=Qt.Key_F6
 
-# Key to get the whole Answer pronounced
+# Key to get the whole Answer field pronounced, if there is a [GTTS::] tags, it will only read the tags
 TTS_KEY_A_ALL=Qt.Key_F7
 
 
 
-#sorry, the TTS wont recite it automatically when there is a sound file in the Question/Answer
-# Option to automatically recite the [GTTS::] tags in the Questions as it appears
-#automaticQuestions_tags = False
-automaticQuestions_tags = True
+#sorry, the TTS won't recite it automatically when there is a sound file in the Question/Answer
 
-# Option to automatically recite the [GTTS::] tags in the Answers as it appears
-#automaticAnswers_tags = False
-automaticAnswers_tags = True
+# Option to automatically recite the Question field as it appears:
+automaticQuestions = False 			 # disable the automatic recite
+#automaticQuestions = TTS_tags_only               # recite only [GTTS::] tags in the Questions as it appears
+#automaticQuestions = TTS_if_no_tag_read_whole    # always recite the whole, but if there is a [GTTS::], it will only read the tags
 
-
-# Option to automatically recite everything that is in the Questions as it appears with the default language.
-automaticQuestions_whole = False
-#automaticQuestions_whole = True
-
-# Option to automatically recite everything that is in the Answers as it appears with the default language.
-automaticAnswers_whole = False
-#automaticAnswers_whole = True
-
+# Option to automatically recite the Answers field as it appears
+automaticAnswers = False                         # disable the automatic recite
+#automaticAnswers = TTS_tags_only                 # recite only [GTTS::] tags in the Answers as it appears
+#automaticAnswers = TTS_if_no_tag_read_whole      # always recite the whole, but if there is a [GTTS::], it will only read the tags
 
 
 #
@@ -163,13 +163,11 @@ slanguages = [['af', 'Afrikaans', 'cp1252'], #or iso-8859-1
 ['cy', 'Welsh',	'iso-8859-14']]
 
 
-
-
-
-
+#Address to the TTS service
+TTS_ADDRESS = 'http://translate.google.com/translate_tts'
 
 ######################### End of Settings ##################################
-import os, subprocess, re, sys
+import os, subprocess, re, sys, urllib
 from ankiqt import mw
 from anki import sound
 from anki.sound import playFromText
@@ -186,6 +184,16 @@ from PyQt4.QtSvg import *
 
 language_generator = TTS_language
 file_max_length = 255 #filename max length for Unix
+
+# Prepend http proxy if one is being used.  Scans the environment for
+# a variable named "http_proxy" for all operating systems
+# proxy code contributted by Scott Otterson
+proxies = urllib.getproxies()
+
+if len(proxies)>0 and "http" in proxies:
+	proxStr = re.sub("http:", "http_proxy:", proxies['http'])
+	TTS_ADDRESS = proxStr + "/" + TTS_ADDRESS
+
 
 # mplayer for windows
 if subprocess.mswindows:
@@ -229,7 +237,7 @@ def playTTSFromText(text):
 		else:
 			speakit.append(sentence)
 		for item in speakit:
-			address.append('http://translate.google.com/translate_tts?tl='+match[0]+'&q='+ quote_plus(item))
+			address.append(TTS_ADDRESS+'?tl='+match[0]+'&q='+ quote_plus(item))
 	if subprocess.mswindows:
 		param = ['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'"]
 		param.extend(address)
@@ -251,18 +259,20 @@ def playTTSFromText(text):
 
 def TTS_read(text, language=TTS_language):
 	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
-	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
+	address = TTS_ADDRESS+'?tl='+language+'&q='+ quote_plus(text)
 	#utils.showInfo(address)
 	if subprocess.mswindows:
+		param = ['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address]
 		if subprocessing:
-			subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 		else:
-			subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
 	else:
+		param = ['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address]
 		if subprocessing:
-			subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 		else:
-			subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address], stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
 
 
 ###################  TTS_record to generate MP3 files
@@ -271,7 +281,7 @@ def TTS_read(text, language=TTS_language):
 
 def TTS_record(text, language=TTS_language):
 	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
-	address = 'http://translate.google.com/translate_tts?tl='+language+'&q='+ quote_plus(text)
+	address = TTS_ADDRESS+'?tl='+language+'&q='+ quote_plus(text)
 	if quote_mp3: #re.sub removes \/:*?"<>|[]. from the file name
 		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text))+'.mp3'
 		if len(file) > file_max_length:
@@ -600,11 +610,17 @@ def newKeyPressEvent(evt):
 		if (pkey == TTS_KEY_Q):
 			playTTSFromText(mw.currentCard.question)  #read the GTTS tags
 		elif (pkey == TTS_KEY_Q_ALL):
-			TTS_read(mw.currentCard.question,TTS_language) #read the the whole field
+			if re.findall("\[GTTS:(.*?):(.*?)\]", mw.currentCard.question, re.M|re.I):
+				playTTSFromText(mw.currentCard.question) #read the GTTS tags
+			else:
+				TTS_read(mw.currentCard.question,TTS_language) #read the the whole field
 		elif (mw.state=='showAnswer' and pkey == TTS_KEY_A):
 			playTTSFromText(mw.currentCard.answer) #read the GTTS tags
 		elif (mw.state=='showAnswer' and pkey == TTS_KEY_A_ALL):
-			TTS_read(mw.currentCard.answer,TTS_language)  #read the the whole field
+			if re.findall("\[GTTS:(.*?):(.*?)\]", mw.currentCard.answer, re.M|re.I):
+				playTTSFromText(mw.currentCard.answer) #read the GTTS tags
+			else:
+				TTS_read(mw.currentCard.answer,TTS_language)  #read the the whole field
 		else:
 			for key in TTS_read_field:
 				if TTS_read_field[key] == pkey:
@@ -616,16 +632,21 @@ def newKeyPressEvent(evt):
 
 
 def GTTSredisplay(self):
-	if (mw.state == 'showQuestion' and not sound.hasSound(mw.currentCard.question)):
-		if (automaticQuestions_tags):
-			playTTSFromText(mw.currentCard.question)
-		if (automaticQuestions_whole):
-			TTS_read(mw.currentCard.question,TTS_language)
-	elif (mw.state=='showAnswer' and not sound.hasSound(mw.currentCard.answer)):
-		if (automaticAnswers_tags):
-			playTTSFromText(mw.currentCard.answer)
-		if (automaticAnswers_whole):
-			TTS_read(mw.currentCard.answer,TTS_language)
+	if mw.state == 'showQuestion' or mw.state == 'showAnswer':
+		if mw.state == 'showQuestion':
+			toread = mw.currentCard.question
+			automatic = automaticQuestions
+		else:
+			toread = mw.currentCard.answer
+			automatic = automaticAnswers
+		if not sound.hasSound(toread):
+			if automatic == TTS_tags_only:
+				playTTSFromText(toread)
+			if automatic == TTS_if_no_tag_read_whole:
+				if re.findall("\[GTTS:(.*?):(.*?)\]", toread, re.M|re.I):
+					playTTSFromText(toread)
+				else:
+					TTS_read(toread,TTS_language)
 
 oldEventHandler = mw.keyPressEvent
 mw.keyPressEvent = newKeyPressEvent
