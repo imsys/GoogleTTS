@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Alpha 3.1'
+version = '0.2.0-Beta'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-05-08
+#  Edited on 2012-05-13
 #  
 #
 ########################### Instructions #######################################
@@ -569,6 +569,8 @@ def onGenerate(self):
 
 	srcField = frm.sourceFieldComboBox.currentIndex()
 	dstField = frm.destinationFieldComboBox.currentIndex()
+	languageField = frm.languageComboBox.currentIndex()
+
 	if srcField == -1 or dstField == -1 :
 		return
 
@@ -578,7 +580,7 @@ def onGenerate(self):
 	self.model.beginReset()
 
 	try:
-		generate_audio_files(sf, TTS_language, frm.fieldlist[srcField], frm.fieldlist[dstField], generate_sound_tags)
+		generate_audio_files(sf, slanguages[languageField][0], frm.fieldlist[srcField], frm.fieldlist[dstField], generate_sound_tags)
 
 	except:
 		print "exception"
@@ -619,11 +621,11 @@ def newKeyHandler(self, evt):
 				playTTSFromText(self.card.a()) #read the GTTS tags
 			else:
 				TTS_read(self.card.a(),TTS_language)  #read the the whole field
-#		else:
-#			for key in TTS_read_field:
-#				if TTS_read_field[key] == pkey:
-#					TTS_read(self.currentCard.fact.get(key, 0),TTS_language)
-#					break
+		else:
+			for key in TTS_read_field:
+				if TTS_read_field[key] == pkey:
+					TTS_read(self.card.note()[key],TTS_language)
+					break
 	evt.accept()
 
 
