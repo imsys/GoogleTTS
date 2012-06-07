@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Alpha 3'
+version = '0.2.0-Alpha 3.1'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-05-04
+#  Edited on 2012-05-08
 #  
 #
 ########################### Instructions #######################################
@@ -172,7 +172,6 @@ from urllib import quote_plus
 from anki.hooks import wrap,addHook
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtGui import *
-import simplejson
 from aqt.reviewer import Reviewer
 
 language_generator = TTS_language
@@ -403,14 +402,14 @@ class GTTS_option_menu_Dialog(object):
 		verticalLayout.addWidget(label)
 
 		label_3 = QtGui.QLabel(Dialog)
-		label_3.setGeometry(QtCore.QRect(100, 10, 200, 51))
+		label_3.setGeometry(QtCore.QRect(100, 10, 250, 51))
 		label_3.setText("GoogleTTS")
 		font = QtGui.QFont()
 		font.setBold(True)
 		font.setPointSize(27)
 		label_3.setFont(font)
 		label_4 = QtGui.QLabel(Dialog)
-		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
+		label_4.setGeometry(QtCore.QRect(190, 50, 150, 17))
 		label_4.setText("Version "+version)
 
 		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
@@ -514,14 +513,14 @@ class GTTS_mp3_mass_generator_Dialog(object):
 		verticalLayout.addWidget(label);
 
 		label_3 = QtGui.QLabel(Dialog)
-		label_3.setGeometry(QtCore.QRect(100, 10, 200, 51))
+		label_3.setGeometry(QtCore.QRect(100, 10, 250, 51))
 		label_3.setText("GoogleTTS")
 		font = QtGui.QFont()
 		font.setBold(True)
 		font.setPointSize(27)
 		label_3.setFont(font)
 		label_4 = QtGui.QLabel(Dialog)
-		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
+		label_4.setGeometry(QtCore.QRect(190, 50, 150, 17))
 		label_4.setText("Version "+version)
 
 		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
@@ -556,6 +555,7 @@ def onGenerate(self):
 	global TTS_language, dstField, srcField, generate_sound_tags
 	sf = self.selectedNotes()
 	if not sf:
+		utils.showInfo("Select the notes and then use the MP3 Mass Generator")
 		return
 	import anki.find
 	fields = sorted(anki.find.fieldNames(self.col, downcase=False))
