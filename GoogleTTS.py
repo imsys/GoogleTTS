@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Alpha 2'
+version = '0.2.0-Alpha 2.1'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-04-25
+#  Edited on 2012-04-26
 #  
 ########################### Announcements #######################################
 #
@@ -167,7 +167,6 @@ from urllib import quote_plus
 from anki.hooks import wrap,addHook
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtGui import *
-from PyQt4.QtSvg import *
 import simplejson
 from aqt.reviewer import Reviewer
 
