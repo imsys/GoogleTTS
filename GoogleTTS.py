@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Beta'
+version = '0.2.0-Beta 2'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-05-13
+#  Edited on 2012-05-18
 #  
 #
 ########################### Instructions #######################################
@@ -528,21 +528,25 @@ class GTTS_mp3_mass_generator_Dialog(object):
 		QtCore.QMetaObject.connectSlotsByName(Dialog)
 
 def generate_audio_files(factIds, language, srcField_name, dstField_name, generate_sound_tags):
+	returnval = {'fieldname_error': 0}
 	nelements = len(factIds)
 	for c, id in enumerate(factIds):
 		note = mw.col.getNote(id)
-		mw.progress.update(label="Generating MP3 files...\n%s of %s\n%s" % (c+1, nelements,note[srcField_name]))
-		print note[srcField_name]
 		
-		try:
-			if generate_sound_tags:
-				note[dstField_name] = '[sound:'+ TTS_record(note[srcField_name], language) +']'
-			else:
-				note[dstField_name] = TTS_record(note[srcField_name], language)
-			print note[dstField_name]
-			note.flush()
-		except:
-			pass
+		if not (srcField_name in note.keys() and dstField_name in note.keys()):
+			returnval['fieldname_error'] += 1
+			continue
+		
+		mw.progress.update(label="Generating MP3 files...\n%s of %s\n%s" % (c+1, nelements,note[srcField_name]))
+		
+		if generate_sound_tags:
+			note[dstField_name] = '[sound:'+ TTS_record(note[srcField_name], language) +']'
+		else:
+			note[dstField_name] = TTS_record(note[srcField_name], language)
+		print note[dstField_name]
+		note.flush()
+		
+	return returnval
 
 
 def setupMenu(editor):
@@ -579,22 +583,19 @@ def onGenerate(self):
 	
 	self.model.beginReset()
 
-	try:
-		generate_audio_files(sf, slanguages[languageField][0], frm.fieldlist[srcField], frm.fieldlist[dstField], generate_sound_tags)
+	result = generate_audio_files(sf, slanguages[languageField][0], frm.fieldlist[srcField], frm.fieldlist[dstField], generate_sound_tags)
 
-	except:
-		print "exception"
-		utils.showInfo("Error")
-		return
-	else:
-		self.onSearch()
-		self.mw.requireReset()
-	finally:
-		self.model.endReset()
-		self.mw.progress.finish()
-	utils.showInfo(ngettext(
+	self.model.endReset()
+	self.mw.progress.finish()
+	nupdated = len(sf) - result['fieldname_error']
+	utils.showInfo((ngettext(
 		"%s note updated",
-		"%s notes updated", len(sf)) % (len(sf))
+		"%s notes updated", nupdated) % (nupdated))+  
+		
+		((ngettext(
+		"\n%s fieldname error. A node doesn't have the Source Field '%s' or the Destination Field '%s'",
+		"\n%s fieldname error. Those nodes don't have the Source Field '%s' or the Destination Field '%s'", result['fieldname_error'])
+		% (result['fieldname_error'], frm.fieldlist[srcField], frm.fieldlist[dstField])) if result['fieldname_error'] > 0 else "")
 		)
 
 from anki.hooks import addHook
