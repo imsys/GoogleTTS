@@ -5,20 +5,14 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Alpha 2.1'
+version = '0.2.0-Alpha 3'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-04-26
+#  Edited on 2012-05-04
 #  
-########################### Announcements #######################################
-#
-# GoogleTTS is still being ported to Anki 2.0, at the moment it can only use the read on the fly and the MP3 Generator.
-#
-# I'm working on porting the MP3 Mass Generator, and I will release it as soon as possible.
-#
 #
 ########################### Instructions #######################################
 # 
@@ -88,6 +82,17 @@ automaticAnswers = False                         # disable the automatic recite
 #automaticAnswers = TTS_if_no_tag_read_whole      # always recite the whole, but if there is a [GTTS::], it will only read the tags
 
 
+#
+# Keys to get the fields pronounced, case sensitive
+# uncomment and change in a way that works for you,
+# you can add as many as you want
+# examples:
+#TTS_read_field['Field Name'] =  Qt.Key_F9
+#TTS_read_field['Front'] =  Qt.Key_F5
+#TTS_read_field['Back'] = Qt.Key_F6
+#TTS_read_field['Reading'] =  Qt.Key_F7
+#TTS_read_field['Text'] = Qt.Key_F8
+#all the available keys are in http://doc.trolltech.com/qtjambi-4.4/html/com/trolltech/qt/core/Qt.Key.html
 
 # quote (encode) special characters for mp3 file names:
 # Windows users should have their mp3 files quoted (True), if you want to try, the system encoding should be the same as the language you are learning. and in the Table slanguage, the right charset should be set there. (it may not work, do this only if you know what you are doing. If you want it really want it, install Linux! :D
@@ -156,7 +161,7 @@ TTS_ADDRESS = 'http://translate.google.com/translate_tts'
 
 ######################### End of Settings ##################################
 import os, subprocess, re, sys, urllib
-from aqt import mw
+from aqt import mw, utils
 from anki import sound
 from anki.sound import playFromText
 from anki.utils import stripHTML
@@ -346,7 +351,6 @@ def GTTS_Factedit_button(self):
 		file = TTS_record(unicode(form.textEdit.toPlainText()), language_generator)
 		self.addMedia(file)
 
-
 def GTTS_Fact_edit_setupFields(self):
 	GoogleTTS = QPushButton(self.widget)
 	GoogleTTS.setFixedHeight(20)
@@ -428,6 +432,171 @@ mw.form.menuTools.addAction(a)
 mw.connect(a, SIGNAL("triggered()"), GTTS_option_menu)
 
 
+
+####################  MP3 Mass Generator
+
+
+srcField = -1
+dstField = -1
+generate_sound_tags = True
+
+
+class GTTS_mp3_mass_generator_Dialog(object):
+	def setupUi(self, Dialog):
+		Dialog.setObjectName("Dialog")
+		Dialog.resize(400, 300)
+		Dialog.setWindowTitle("GoogleTTS :: MP3 Mass Generator")
+
+		buttonBox = QDialogButtonBox(Dialog);
+		buttonBox.setGeometry(QtCore.QRect(30, 240, 341, 32));
+		buttonBox.setOrientation(QtCore.Qt.Horizontal);
+		buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok|QtGui.QDialogButtonBox.Cancel);
+		verticalLayoutWidget = QtGui.QWidget(Dialog);
+		verticalLayoutWidget.setGeometry(QtCore.QRect(20, 70, 357, 171));
+		verticalLayout = QtGui.QVBoxLayout(verticalLayoutWidget);
+		verticalLayout.setContentsMargins(0, 0, 0, 0);
+		label_2 = QtGui.QLabel(verticalLayoutWidget);
+		label_2.setText("GoogleTTS will generate MP3 files to all selected facts.");
+
+		verticalLayout.addWidget(label_2);
+		
+		self.fieldlist = []
+		for f in mw.col.models.all():
+			for a in f['flds']:
+				self.fieldlist.append(a['name'])
+
+		formLayoutWidget = QtGui.QWidget(Dialog)
+		formLayoutWidget.setGeometry(QtCore.QRect(20, 60, 329, 118));
+		formLayout = QtGui.QFormLayout(formLayoutWidget);
+		#formLayout.setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+		formLayout.setContentsMargins(0, 0, 0, 0);
+
+
+
+		languageLabel = QtGui.QLabel(formLayoutWidget)
+		languageLabel.setText("Language")
+		formLayout.setWidget(0, QtGui.QFormLayout.LabelRole, languageLabel)
+		self.languageComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.languageComboBox.addItems([d[1] for d in slanguages])
+		self.languageComboBox.setCurrentIndex(get_language_id(TTS_language))
+		formLayout.setWidget(0, QtGui.QFormLayout.FieldRole, self.languageComboBox)
+
+
+		sourceFieldLabel = QtGui.QLabel(formLayoutWidget)
+		sourceFieldLabel.setText("Source Field")
+		formLayout.setWidget(1, QtGui.QFormLayout.LabelRole, sourceFieldLabel)
+		self.sourceFieldComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.sourceFieldComboBox.addItems([d for d in self.fieldlist])
+		self.sourceFieldComboBox.setCurrentIndex(srcField)
+		formLayout.setWidget(1, QtGui.QFormLayout.FieldRole, self.sourceFieldComboBox)
+
+
+		destinationFieldLabel = QtGui.QLabel(formLayoutWidget)
+		destinationFieldLabel.setText("Destination Field")
+		formLayout.setWidget(2, QtGui.QFormLayout.LabelRole, destinationFieldLabel)
+		self.destinationFieldComboBox = QtGui.QComboBox(formLayoutWidget)
+		self.destinationFieldComboBox.addItems([d for d in self.fieldlist])
+		self.destinationFieldComboBox.setCurrentIndex(dstField)
+		formLayout.setWidget(2, QtGui.QFormLayout.FieldRole, self.destinationFieldComboBox)
+
+
+		self.checkBox = QtGui.QCheckBox(Dialog)
+		self.checkBox.setText("Generate sound file path within the [sound:] tag.")
+		if generate_sound_tags:
+			self.checkBox.setChecked(True)
+
+		label = QtGui.QLabel(verticalLayoutWidget);
+		label.setText("It will overwrite anything in the Destination Field. Make sure to select the right field. It may take a while.");
+		label.setWordWrap(True);
+
+		verticalLayout.addWidget(formLayoutWidget);
+		verticalLayout.addWidget(self.checkBox);
+		verticalLayout.addWidget(label);
+
+		label_3 = QtGui.QLabel(Dialog)
+		label_3.setGeometry(QtCore.QRect(100, 10, 200, 51))
+		label_3.setText("GoogleTTS")
+		font = QtGui.QFont()
+		font.setBold(True)
+		font.setPointSize(27)
+		label_3.setFont(font)
+		label_4 = QtGui.QLabel(Dialog)
+		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
+		label_4.setText("Version "+version)
+
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
+		QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+def generate_audio_files(factIds, language, srcField_name, dstField_name, generate_sound_tags):
+	nelements = len(factIds)
+	for c, id in enumerate(factIds):
+		note = mw.col.getNote(id)
+		mw.progress.update(label="Generating MP3 files...\n%s of %s\n%s" % (c+1, nelements,note[srcField_name]))
+		print note[srcField_name]
+		
+		try:
+			if generate_sound_tags:
+				note[dstField_name] = '[sound:'+ TTS_record(note[srcField_name], language) +']'
+			else:
+				note[dstField_name] = TTS_record(note[srcField_name], language)
+			print note[dstField_name]
+			note.flush()
+		except:
+			pass
+
+
+def setupMenu(editor):
+	a = QAction("GoogleTTS MP3 Mass Generator", editor)
+	editor.form.menuEdit.addAction(a)
+	editor.connect(a, SIGNAL("triggered()"), lambda e=editor: onGenerate(e))
+
+
+def onGenerate(self):
+	global TTS_language, dstField, srcField, generate_sound_tags
+	sf = self.selectedNotes()
+	if not sf:
+		return
+	import anki.find
+	fields = sorted(anki.find.fieldNames(self.col, downcase=False))
+	d = QDialog(self)
+	frm = GTTS_mp3_mass_generator_Dialog()
+	frm.setupUi(d)
+	d.setWindowModality(Qt.WindowModal)
+
+	if not d.exec_():
+		return
+
+	srcField = frm.sourceFieldComboBox.currentIndex()
+	dstField = frm.destinationFieldComboBox.currentIndex()
+	if srcField == -1 or dstField == -1 :
+		return
+
+	self.mw.checkpoint(_("GoogleTTS MP3 Mass Generator"))
+	self.mw.progress.start(immediate=True, label="Generating MP3 files...")
+	
+	self.model.beginReset()
+
+	try:
+		generate_audio_files(sf, TTS_language, frm.fieldlist[srcField], frm.fieldlist[dstField], generate_sound_tags)
+
+	except:
+		print "exception"
+		utils.showInfo("Error")
+		return
+	else:
+		self.onSearch()
+		self.mw.requireReset()
+	finally:
+		self.model.endReset()
+		self.mw.progress.finish()
+	utils.showInfo(ngettext(
+		"%s note updated",
+		"%s notes updated", len(sf)) % (len(sf))
+		)
+
+from anki.hooks import addHook
+addHook("browser.setupMenus", setupMenu)
 
 
 ######################################### Keys and AutoRead
