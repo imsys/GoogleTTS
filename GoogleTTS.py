@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin
-version = '0.1.0'
+version = '0.1.1'
 #
 #   Any problems, comments, please post in this thread:  (or email me)
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on Saturday, 5 March 2011
+#  Edited on Friday, 2 September 2011
 #  
 ########################### Instructions #######################################
 #
@@ -31,7 +31,7 @@ version = '0.1.0'
 # so if you want GoogleTTS to read a field for you, you can edit your card's model and leave it like:
 # [GTTS:en:{{Field Name}}]
 #
-# To hide the [GTTS::] tag and everthing inside it in a card model (only) (thanks Rdamon for the idea)
+# To hide the [GTTS::] tag and everything inside it in a card model (only) (thanks Rdamon for the idea)
 # <!-- [GTTS:en:{{Field Name}}] -->
 #
 #
@@ -40,6 +40,15 @@ version = '0.1.0'
 #
 # it will only read the cards on the Anki Desktop, if you want it on the mobile, you need to generate the MP3 files.
 #
+#######################################
+#
+# I have a recommendation to everybody:
+# I encourage you to watch the documentary movie: "Zeitgeist: Moving Forward"
+# It's probably the most important movie you could ever watch.
+# http://www.youtube.com/watch?v=4Z9WVZddH9w
+#
+# I also recommend a website to live your live to the full potential:
+# http://www.highexistence.com/
 #
 ########################### Settings #######################################
 from PyQt4.QtCore import *
@@ -84,10 +93,6 @@ automaticAnswers_whole = False
 # Keys to get the fields pronounced, case sensitive
 # uncomment and change in a way that works for you,
 # you can add as many as you want
-# *** this function will probably be removed in the next version,
-# *** so try to use the [GTTS:language_code:{{Field Name}}] tag as explained above.
-# *** the [GTTS::] tags are much more flexible, and easier to configure when you have many decks and different languages
-# *** if you are against the removal of this function, send me a email with the reasons
 # examples:
 #TTS_read_field['Field Name'] =  Qt.Key_F9
 #TTS_read_field['Front'] =  Qt.Key_F5
@@ -104,13 +109,11 @@ quote_mp3 = True	# sp%C3%A9cial.mp3 %E3%81%AF%E3%81%84.mp3 %E4%BD%A0%E5%A5%BD.mp
 #quote_mp3 = False  # spécial.mp3 はい.mp3　你好.mp3
 
 
-#subprocessing is disabled by default
-#if you enable it (true) on MS Windows, it *may or may not* result in a bug of cut the ending of a speech occasionally
-#all plataforms: if it's enable, it will be able to play only one [GTTS::] tags in the answer/question, even if there is two or more.
-#if it's disable(false), Anki will be frozen while GoogleTTS is reciting the speech. 
-#so you can try it if you want.
-subprocessing = False
-#subprocessing = True
+#subprocessing is enabled by default
+# on MS Windows XP or older, there is a bug of cutting the ending of a speech occasionally, so you may want to desable it.
+#if it's disable(false), Anki will be frozen while GoogleTTS recites the speech. 
+#subprocessing = False
+subprocessing = True
 
 
 #Language code
@@ -119,45 +122,50 @@ TTS_language = 'en'
 
 #Supported Languages       
 # code , Language, windows charset encoding
-slanguages = [['af', 'Afrikaans'],
-['sq', 'Albanian'],
-['ar', 'Arabic', 'cp1256'],
-['hy', 'Armenian', 'armscii-8'],
-['ca', 'Catalan'],
-['zh', 'Chinese', 'cp936'],
-['hr', 'Croatian'],
-['cs', 'Czech'],
-['da', 'Danish'],
-['nl', 'Dutch'],
-['en', 'English'],
-['fi', 'Finnish'],
-['fr', 'French'],
-['de', 'German'],
-['el', 'Greek', 'cp1253'],
-['ht', 'Haitian Creole'],
-['hi', 'Hindi'],
-['hu', 'Hungarian'],
-['is', 'Icelandic'],
+slanguages = [['af', 'Afrikaans', 'cp1252'], #or iso-8859-1
+['sq', 'Albanian',	'cp1250'], #or iso 8859-16
+['ar', 'Arabic',	'cp1256'], #or iso-8859-6
+['hy', 'Armenian',	'armscii-8'],
+['ca', 'Catalan',	'cp1252'], #or iso-8859-1
+['zh', 'Chinese',	'cp936'],
+['hr', 'Croatian',	'cp1250'], #or iso-8859-2
+['cs', 'Czech',	'cp1250'], #or iso-8859-2
+['da', 'Danish',	'cp1252'], #or iso-8859-1
+['nl', 'Dutch',	'cp1252'], #or iso-8859-1
+['en', 'English',	'cp1252'], #or iso-8859-1
+['fi', 'Finnish',	'cp1252'], #or iso-8859-1
+['fr', 'French',	'cp1252'], #or iso-8859-1
+['de', 'German',	'cp1252'], #or iso-8859-1
+['el', 'Greek',	'cp1253'], #or iso-8859-7
+['ht', 'Haitian Creole',	'cp1252'], #or iso-8859-1
+['hi', 'Hindi',	'cp1252'], #or iso-8859-1
+['hu', 'Hungarian',	'cp1250'], #or iso-8859-2
+['is', 'Icelandic',	'cp1252'], #or iso-8859-1
 ['id', 'Indonesian'],
-['it', 'Italian'],
-['ja', 'Japanese', 'cp932'],
-['ko', 'Korean', 'cp949'],
+['it', 'Italian',	'cp1252'], #or iso-8859-1
+['ja', 'Japanese',	'cp932'], #or shift_jis, iso-2022-jp, euc-jp
+['ko', 'Korean',	'cp949'], #or euc-kr
 ['la', 'Latin'],
-['lv', 'Latvian'],
-['mk', 'Macedonian'],
-['no', 'Norwegian'],
-['pl', 'Polish'],
-['pt', 'Portuguese'],
-['ro', 'Romanian'],
-['ru', 'Russian', 'cp1251'],
-['sr', 'Serbian'],
-['sk', 'Slovak'],
-['es', 'Spanish'],
-['sw', 'Swahili'],
-['sv', 'Swedish'],
-['tr', 'Turkish', 'cp1254'],
-['vi', 'Vietnamese', 'cp1258'],
-['cy', 'Welsh']]
+['lv', 'Latvian',	'cp1257'], #or iso-8859-13
+['mk', 'Macedonian',	'cp1251'], #iso-8859-5
+['no', 'Norwegian',	'cp1252'], #or iso-8859-1
+['pl', 'Polish',	'cp1250'], #or iso-8859-2
+['pt', 'Portuguese',	'cp1252'], #or iso-8859-1
+['ro', 'Romanian',	'cp1250'], #or iso-8859-2
+['ru', 'Russian',	'cp1251'], #or koi8-r, iso-8859-5
+['sr', 'Serbian',	'cp1250'], # cp1250 for latin, cp1251 for cyrillic
+['sk', 'Slovak',	'cp1250'], #or iso-8859-2
+['es', 'Spanish',	'cp1252'], #or iso-8859-1
+['sw', 'Swahili',	'cp1252'], #or iso-8859-1
+['sv', 'Swedish',	'cp1252'], #or iso-8859-1
+['tr', 'Turkish',	'cp1254'], #or iso-8859-9
+['vi', 'Vietnamese',	'cp1258'],
+['cy', 'Welsh',	'iso-8859-14']]
+
+
+
+
+
 
 
 ######################### End of Settings ##################################
@@ -201,8 +209,42 @@ def get_language_id(language_code):
 		x = x + 1
 
 def playTTSFromText(text):
+	address = []
 	for match in re.findall("\[GTTS:(.*?):(.*?)\]", text, re.M|re.I):
-		TTS_read(match[1], match[0])
+		speakit = []
+		sentence = match[1]
+		sentence = re.sub("\[sound:.*?\]", "", stripHTML(sentence.replace("\n", "")).encode('utf-8'))
+		if len(sentence) > 100:
+			utils.showInfo(sentence)
+			split1 = sentence.split('.')
+			for item1 in split1:
+				if len(item1) > 100:
+					utils.showInfo(item1)
+					split2 = sentence.split(',')
+					for item2 in split2:
+						if len(item2) < 100:
+							speakit.append(item2)
+				else:
+					speakit.append(item1)
+		else:
+			speakit.append(sentence)
+		for item in speakit:
+			address.append('http://translate.google.com/translate_tts?tl='+match[0]+'&q='+ quote_plus(item))
+	if subprocess.mswindows:
+		param = ['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'"]
+		param.extend(address)
+		if subprocessing:
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		else:
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+	else:
+		param = ['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'"]
+		param.extend(address)
+		if subprocessing:
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		else:
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+	
 
 
 ###########  TTS_read to recite the tts on-the-fly
