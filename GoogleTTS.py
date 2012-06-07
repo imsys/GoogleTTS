@@ -5,19 +5,19 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Alpha 1'
+version = '0.2.0-Alpha 2'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-04-24
+#  Edited on 2012-04-25
 #  
 ########################### Announcements #######################################
 #
-# GoogleTTS is still being ported to Anki 2.0, at the moment it can only read on the fly.
+# GoogleTTS is still being ported to Anki 2.0, at the moment it can only use the read on the fly and the MP3 Generator.
 #
-# I'm working on porting the MP3 Generator and the MP3 Mass Generator, and I will release it as soon as possible.
+# I'm working on porting the MP3 Mass Generator, and I will release it as soon as possible.
 #
 #
 ########################### Instructions #######################################
@@ -83,9 +83,18 @@ automaticQuestions = False 			 # disable the automatic recite
 #automaticQuestions = TTS_if_no_tag_read_whole    # always recite the whole, but if there is a [GTTS::], it will only read the tags
 
 # Option to automatically recite the Answers field as it appears
-#automaticAnswers = False                         # disable the automatic recite
+automaticAnswers = False                         # disable the automatic recite
 #automaticAnswers = TTS_tags_only                 # recite only [GTTS::] tags in the Answers as it appears
 #automaticAnswers = TTS_if_no_tag_read_whole      # always recite the whole, but if there is a [GTTS::], it will only read the tags
+
+
+
+# quote (encode) special characters for mp3 file names:
+# Windows users should have their mp3 files quoted (True), if you want to try, the system encoding should be the same as the language you are learning. and in the Table slanguage, the right charset should be set there. (it may not work, do this only if you know what you are doing. If you want it really want it, install Linux! :D
+# Unix users don't need to quote (encode) special characters. so you can set it as False if you want.
+# it will work alright sync with AnkiMobile, but it won't work with AnkiWeb
+quote_mp3 = True	# spC3A9cial.mp3 E381AFE38184.mp3 E4BDA0E5A5BD.mp3
+#quote_mp3 = False  # spécial.mp3 はい.mp3　你好.mp3
 
 
 #subprocessing is enabled by default
@@ -97,7 +106,6 @@ subprocessing = True
 
 #Language code
 TTS_language = 'en'
-
 
 
 #Supported Languages       
@@ -148,7 +156,7 @@ TTS_ADDRESS = 'http://translate.google.com/translate_tts'
 
 ######################### End of Settings ##################################
 import os, subprocess, re, sys, urllib
-#from ankiqt import mw
+from aqt import mw
 from anki import sound
 from anki.sound import playFromText
 from anki.utils import stripHTML
@@ -156,7 +164,7 @@ from anki.utils import stripHTML
 from subprocess import Popen, PIPE, STDOUT
 from urllib import quote_plus
 #from ankiqt.ui import view,facteditor,utils
-from anki.hooks import wrap
+from anki.hooks import wrap,addHook
 from PyQt4 import QtGui,QtCore
 from PyQt4.QtGui import *
 from PyQt4.QtSvg import *
@@ -235,6 +243,193 @@ def playTTSFromText(text):
 			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 		else:
 			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+
+
+###########  TTS_read to recite the tts on-the-fly
+
+def TTS_read(text, language=TTS_language):
+	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
+	address = TTS_ADDRESS+'?tl='+language+'&q='+ quote_plus(text)
+	if subprocess.mswindows:
+		param = ['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address]
+		if subprocessing:
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		else:
+			subprocess.Popen(param, startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+	else:
+		param = ['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address]
+		if subprocessing:
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+		else:
+			subprocess.Popen(param, stdin=PIPE, stdout=PIPE, stderr=STDOUT).communicate()
+
+
+
+###################  TTS_record to generate MP3 files
+
+def TTS_record(text, language=TTS_language):
+	text = re.sub("\[sound:.*?\]", "", stripHTML(text.replace("\n", "")).encode('utf-8'))
+	address = TTS_ADDRESS+'?tl='+language+'&q='+ quote_plus(text)
+	if quote_mp3: #re.sub removes \/:*?"<>|[]. from the file name
+		file = quote_plus(re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text)).replace("%", "")+'.mp3'
+		if len(file) > file_max_length:
+			file = file[0:file_max_length-4] +'.mp3'
+	else:
+		file = re.sub('[\\\/\:\*\?"<>|\[\]\.]*', "",text)+'.mp3'
+		if len(file) > file_max_length:
+			file = file[0:file_max_length-4] +'.mp3'
+		if subprocess.mswindows:
+			file = file.decode('utf-8').encode(slanguages[get_language_id(language)][2])
+	if subprocess.mswindows:
+		subprocess.Popen(['mplayer.exe', '-ao', 'win32', '-slave', '-user-agent', "'Mozilla/5.0'", address, '-dumpstream', '-dumpfile', file], startupinfo=si, stdin=PIPE, stdout=PIPE, stderr=STDOUT).wait()
+		if not quote_mp3:
+			return file.decode(slanguages[get_language_id(language)][2])
+	else:
+		subprocess.Popen(['mplayer', '-slave', '-user-agent', "'Mozilla/5.0'", address, '-dumpstream', '-dumpfile', file], stdin=PIPE, stdout=PIPE, stderr=STDOUT).wait()
+	return file.decode('utf-8')
+
+
+
+############################ MP3 File Generator
+
+
+class Ui_Dialog1(object):
+	def setupUi(self, Dialog):
+		Dialog.setObjectName("Dialog")
+		Dialog.resize(400, 300)
+		Dialog.setWindowTitle("GoogleTTS :: MP3 File Generator")
+		self.gridLayout = QtGui.QGridLayout(Dialog)
+		self.gridLayout.setContentsMargins(10, 10, 10, 10)
+		self.comboboxlabel = QtGui.QLabel(Dialog)
+		self.comboboxlabel.setText("Language:")
+		self.combobox = QtGui.QComboBox()
+		self.combobox.addItems([d[1] for d in slanguages])
+		self.combobox.setCurrentIndex(get_language_id(language_generator))
+		self.textEditlabel = QtGui.QLabel(Dialog)
+		self.textEditlabel.setText("Text:")
+		self.charleft = QtGui.QLabel(Dialog)
+		self.charleft.setText("Characters left: 100")
+		self.charleft.setToolTip(_("GoogleTTS can read up to 100 characters, no more than that, sorry :'("))
+		self.textEdit = QtGui.QTextEdit(Dialog)
+		self.textEdit.setAcceptRichText(False)
+		self.textEdit.setObjectName("textEdit")
+
+		self.gridLayout.addWidget(self.comboboxlabel, 0, 0, 1, 1)
+		self.gridLayout.addWidget(self.combobox, 1, 0, 1, 1)
+		self.gridLayout.addWidget(self.textEditlabel, 0, 1, 1, 1)
+		self.gridLayout.addWidget(self.charleft, 0, 2, 1, 1)
+		self.gridLayout.addWidget(self.textEdit, 1, 1, 1, 2)
+		self.buttonBox = QtGui.QDialogButtonBox(Dialog)
+		self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+		self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok|QtGui.QDialogButtonBox.Cancel)
+		self.buttonBox.setObjectName("buttonBox")
+		self.gridLayout.addWidget(self.buttonBox, 3, 1, 1, 3)
+		self.previewbutton = QtGui.QPushButton(Dialog)
+		self.previewbutton.setObjectName("preview")
+		self.previewbutton.setText("Preview")
+		self.gridLayout.addWidget(self.previewbutton, 2, 1, 1, 2)
+
+		QtCore.QObject.connect(self.textEdit, QtCore.SIGNAL("textChanged()"), lambda self=self: self.charleft.setText("Characters left: "+ str(100-len(unicode(self.textEdit.toPlainText()).encode('utf-8')))))
+		QtCore.QObject.connect(self.previewbutton, QtCore.SIGNAL("clicked()"), lambda self=self: TTS_read(unicode(self.textEdit.toPlainText()), slanguages[self.combobox.currentIndex()][0]))
+		QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
+		QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
+		QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+
+def GTTS_Factedit_button(self):
+	global language_generator
+	d = QDialog()
+	form = Ui_Dialog1()
+	form.setupUi(d)
+
+	if d.exec_():
+		language_generator = slanguages[form.combobox.currentIndex()][0]
+		file = TTS_record(unicode(form.textEdit.toPlainText()), language_generator)
+		self.addMedia(file)
+
+
+def GTTS_Fact_edit_setupFields(self):
+	GoogleTTS = QPushButton(self.widget)
+	GoogleTTS.setFixedHeight(20)
+	GoogleTTS.setFixedWidth(20)
+	GoogleTTS.setCheckable(True)
+	GoogleTTS.connect(GoogleTTS, SIGNAL("clicked()"), lambda self=self: GTTS_Factedit_button(self))
+	GoogleTTS.setIcon(QIcon(":/icons/speaker.png"))
+	GoogleTTS.setToolTip(_("GoogleTTS :: MP3 File Generator"))
+	GoogleTTS.setShortcut(_("Ctrl+g"))
+	GoogleTTS.setFocusPolicy(Qt.NoFocus)
+	#GoogleTTS.setEnabled(False)
+	self.iconsBox.addWidget(GoogleTTS)
+	GoogleTTS.setStyle(self.plastiqueStyle)
+
+
+addHook("setupEditorButtons", GTTS_Fact_edit_setupFields)
+
+
+#################### TTS in Tool's menu
+
+class GTTS_option_menu_Dialog(object):
+	def setupUi(self, Dialog):
+		Dialog.setObjectName("Dialog")
+		Dialog.resize(400, 300)
+		Dialog.setWindowTitle("GoogleTTS")
+
+		buttonBox = QDialogButtonBox(Dialog);
+		buttonBox.setGeometry(QtCore.QRect(30, 240, 341, 32));
+		buttonBox.setOrientation(QtCore.Qt.Horizontal);
+		buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Ok|QtGui.QDialogButtonBox.Cancel);
+		verticalLayoutWidget = QtGui.QWidget(Dialog);
+		verticalLayoutWidget.setGeometry(QtCore.QRect(20, 70, 357, 151));
+		verticalLayout = QtGui.QVBoxLayout(verticalLayoutWidget);
+		verticalLayout.setContentsMargins(0, 0, 0, 0);
+		label_2 = QtGui.QLabel(verticalLayoutWidget);
+		label_2.setText("Choose the language that will be used by GoogleTTS");
+
+		verticalLayout.addWidget(label_2);
+
+		self.combobox = QtGui.QComboBox(verticalLayoutWidget);
+		self.combobox.addItems([d[1] for d in slanguages])
+		self.combobox.setCurrentIndex(get_language_id(TTS_language))
+
+		verticalLayout.addWidget(self.combobox);
+
+		label = QtGui.QLabel(verticalLayoutWidget);
+		label.setText("This will be reset when you close Anki. For a permanent change, you have to edit the GoogleTTS.py file.");
+		label.setWordWrap(True);
+
+		verticalLayout.addWidget(label)
+
+		label_3 = QtGui.QLabel(Dialog)
+		label_3.setGeometry(QtCore.QRect(100, 10, 200, 51))
+		label_3.setText("GoogleTTS")
+		font = QtGui.QFont()
+		font.setBold(True)
+		font.setPointSize(27)
+		label_3.setFont(font)
+		label_4 = QtGui.QLabel(Dialog)
+		label_4.setGeometry(QtCore.QRect(190, 50, 111, 17))
+		label_4.setText("Version "+version)
+
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("accepted()"), Dialog.accept)
+		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
+		QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+
+def GTTS_option_menu():
+	global TTS_language
+	d = QDialog()
+	form = GTTS_option_menu_Dialog()
+	form.setupUi(d)
+	if d.exec_():
+		TTS_language = slanguages[form.combobox.currentIndex()][0]
+
+a = QAction(mw)
+a.setText("GoogleTTS")
+mw.form.menuTools.addAction(a)
+mw.connect(a, SIGNAL("triggered()"), GTTS_option_menu)
+
+
+
 
 ######################################### Keys and AutoRead
 
