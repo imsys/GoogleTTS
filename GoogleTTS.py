@@ -5,13 +5,13 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 #
 #   GoogleTTS plugin for Anki 2.0
-version = '0.2.0-Beta 2'
+version = '0.2.0 Release'
 #
 #   Any problems, comments, please post in this thread:  (or email me: arthur@life.net.br )
 #
 #   http://groups.google.com/group/ankisrs/browse_thread/thread/98177e2770659b31
 #
-#  Edited on 2012-05-18
+#  Edited on 2012-08-07
 #  
 #
 ########################### Instructions #######################################
@@ -30,7 +30,8 @@ version = '0.2.0-Beta 2'
 # to hide it while editing a card, the only way I know is:
 # <span style="color:#ffffff;">[GTTS:en:Hello World]</span>
 #
-# it will only read the cards on the Anki Desktop, if you want it on the mobile, you need to generate the MP3 files.
+# The [GTTS::] tag will only read the cards on the Anki Desktop.
+# If you want it to work on the mobile, you need to generate the MP3 files.
 #
 ## Proxy - If you use a proxy connection, GoogleTTS plugin will use the configuration
 # from Anki's proxy confirguration (Settings > Preferences > Network > Proxy) 
@@ -38,6 +39,7 @@ version = '0.2.0-Beta 2'
 # empty, it will try to use the Operational System proxy configuration.
 #
 # Thanks Scott Otterson for contributing with the proxy code.
+# Thanks Dusan Arsenijevic for contributing with a way to not fall in Google's blacklist while doing the Mass Generator.
 #
 #######################################
 #
@@ -160,7 +162,7 @@ slanguages = [['af', 'Afrikaans', 'cp1252'], #or iso-8859-1
 TTS_ADDRESS = 'http://translate.google.com/translate_tts'
 
 ######################### End of Settings ##################################
-import os, subprocess, re, sys, urllib
+import os, subprocess, re, sys, urllib, time
 from aqt import mw, utils
 from anki import sound
 from anki.sound import playFromText
@@ -179,7 +181,7 @@ file_max_length = 255 # Max filename length for Unix
 
 # Prepend http proxy if one is being used.  Scans the environment for
 # a variable named "http_proxy" for all operating systems
-# proxy code contributted by Scott Otterson
+# proxy code contributed by Scott Otterson
 proxies = urllib.getproxies()
 
 if len(proxies)>0 and "http" in proxies:
@@ -527,10 +529,22 @@ class GTTS_mp3_mass_generator_Dialog(object):
 		QtCore.QObject.connect(buttonBox, QtCore.SIGNAL("rejected()"), Dialog.reject)
 		QtCore.QMetaObject.connectSlotsByName(Dialog)
 
+#take a break, so we don't fall in Google's blacklist. Code contributed by Dusan Arsenijevic
+def take_a_break(ndone, ntotal):      
+	t = 500;
+	while True:
+		mw.progress.update(label="Generated %s of %s, \n sleeping for %s seconds...." % (ndone+1, ntotal, t))
+		time.sleep(1)
+		t = t-1
+		if t==0: break
+
 def generate_audio_files(factIds, language, srcField_name, dstField_name, generate_sound_tags):
 	returnval = {'fieldname_error': 0}
 	nelements = len(factIds)
+	batch = 900
 	for c, id in enumerate(factIds):
+		if (c+1)%batch == 0:
+			take_a_break(c, nelements)
 		note = mw.col.getNote(id)
 		
 		if not (srcField_name in note.keys() and dstField_name in note.keys()):
